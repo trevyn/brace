@@ -629,7 +629,7 @@ impl eframe::App for App {
 							COMPLETION.lock().unwrap().clear();
 							if let Some(mut state) = egui::TextEdit::load_state(ctx, id) {
 								let ccursor = egui::text::CCursor::new(entry.content.chars().count());
-								state.set_ccursor_range(Some(egui::text::CCursorRange::one(ccursor)));
+								state.cursor.set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
 								state.store(ctx, id);
 								// ui.ctx().memory().request_focus(text_edit_id); // give focus back to the `TextEdit`.
 							}
