@@ -7,16 +7,16 @@ rust-version = "1.72"
 version = "0.1.0"
 
 [dependencies]
-async-openai = "0.21" 
-byteorder = "1" 
-bytes = "1" 
-cpal = "0.15" 
-crossbeam = "0.8" 
-deepgram = {path = "deepgram-rust-sdk"} 
-eframe = {version = "0.27", default-features = false, features = ["default_fonts", "glow", "persistence"]} 
-egui = "0.27" # egui_node_graph uses 0.25
-egui_extras = {version = "0.27", features = ["image"]} 
-# egui_node_graph = {git = "https://github.com/trevyn/egui_node_graph", branch = "node-zoom-trevyn"} 
+async-openai = "0.21"
+byteorder = "1"
+bytes = "1"
+cpal = "0.15"
+crossbeam = "0.8"
+deepgram = {path = "deepgram-rust-sdk"}
+eframe = {version = "0.27", default-features = false, features = ["default_fonts", "glow", "persistence"]}
+egui = "0.27"
+egui_extras = {version = "0.27", features = ["image"]}
+egui_node_graph2 = "0.5"
 ehttp = "0.5"
 env_logger = "0.11"
 futures = "0.3"
