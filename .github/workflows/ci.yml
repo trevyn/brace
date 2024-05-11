@@ -59,19 +59,19 @@ jobs:
       - run: ls
         working-directory: target/release
 
-      - run: mv target/release/grace grace
+      - run: mv target/release/brace brace
         if: ${{ matrix.os != 'windows-latest' }}
 
-      - run: mv target/release/grace.exe grace
+      - run: mv target/release/brace.exe brace
         if: ${{ matrix.os == 'windows-latest' }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.rust == 'stable' }}
         with:
           name: ${{ matrix.os }}
-          path: grace
+          path: brace
 
-      # - run: zip -9 grace.zip grace
+      # - run: zip -9 brace.zip brace
   release:
     permissions:
       contents: write
@@ -87,9 +87,9 @@ jobs:
       - run: echo "BUILD_ID=$(cat build_id/build_id)" >> $GITHUB_ENV
 
       - run: |
-          mv macos-latest/grace grace
-          mv windows-latest/grace grace.exe
+          mv macos-latest/brace brace
+          mv windows-latest/brace brace.exe
 
-      - run: gh release create ${{ env.BUILD_ID }} --target ${{ github.sha }} --generate-notes grace grace.exe
+      - run: gh release create ${{ env.BUILD_ID }} --target ${{ github.sha }} --generate-notes brace brace.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

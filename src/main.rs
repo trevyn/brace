@@ -925,7 +925,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// std::thread::spawn(move || rt.block_on(async {}));
 
 	eframe::run_native(
-		"grace",
+		"brace",
 		eframe::NativeOptions {
 			viewport: egui::ViewportBuilder::default()
 				.with_inner_size([400.0, 300.0])
