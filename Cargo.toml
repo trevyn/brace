@@ -33,11 +33,7 @@ serde_json = "1"
 stream-cancel = "0.8"
 tokio = {version = "1", features = ["full"]}
 tracked = "0.5"
-turbosql = "0.10.0"
-
-# this can be removed when updating to egui 0.26
-[target.'cfg(any(target_os = "windows"))'.dependencies]
-winapi = {version = "0.3.9", features = ["winuser"]}
+turbosql = "0.10"
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
