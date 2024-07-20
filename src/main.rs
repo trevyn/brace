@@ -31,11 +31,7 @@ mod session;
 
 static DURATION: Lazy<Mutex<f64>> = Lazy::new(Default::default);
 static COMPLETION: Lazy<Mutex<String>> = Lazy::new(Default::default);
-static COMPLETION_PROMPT: Lazy<Mutex<String>> = Lazy::new(|| {
-	Mutex::new(String::from(
-		"For the personal conversational transcript above, here is a coaching prompt:",
-	))
-});
+static COMPLETION_PROMPT: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::from("")));
 
 #[derive(Clone)]
 struct ChatMessage {
@@ -306,17 +302,8 @@ impl eframe::App for App {
 
 		// let cards = select!(Vec<Card> "WHERE NOT deleted").unwrap();
 
-		let mut do_all = false;
-
 		SidePanel::left("left_panel").show(ctx, |ui| {
 			ui.label(option_env!("BUILD_ID").unwrap_or("DEV"));
-
-			let mut setting = Setting::get("deepgram_api_key");
-			ui.label("deepgram api key:");
-			ui
-				.add(TextEdit::singleline(&mut setting.value).desired_width(f32::INFINITY))
-				.changed()
-				.then(|| setting.save());
 
 			let mut setting2 = Setting::get("openai_api_key");
 			ui.label("openai api key:");
@@ -328,12 +315,6 @@ impl eframe::App for App {
 			if ui.button("add window").clicked() {
 				WHEEL_WINDOWS.lock().unwrap().push(Default::default());
 			};
-
-			if ui.button("do all").clicked() {
-				do_all = true;
-			};
-
-			ui.label(format!("Duration: {}", *DURATION.lock().unwrap()));
 
 			for name in self.speaker_names.iter_mut() {
 				ui.horizontal(|ui| {
@@ -484,7 +465,7 @@ impl eframe::App for App {
 						let (trigger, tripwire) = Tripwire::new();
 						self.trigger = Some(trigger);
 						tokio::spawn(async move {
-							run_openai(GPT_4, tripwire, orig_messages, move |content| {
+							run_openai("gpt-4o-mini", tripwire, orig_messages, move |content| {
 								WHEEL_WINDOWS
 									.lock()
 									.unwrap()
@@ -630,20 +611,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	self_update::self_update().await.ok();
 
-	let mut setting = Setting::get("deepgram_api_key");
-	if let Ok(key) = env::var("DEEPGRAM_API_KEY") {
-		setting.value = key;
-		setting.save();
-	};
-
-	let mut setting = Setting::get("openai_api_key");
-	if let Ok(key) = env::var("OPENAI_API_KEY") {
-		setting.value = key;
-		setting.save();
-	};
-
-	// gcal2().await
-
 	// Ok(())
 	// let rt = tokio::runtime::Runtime::new().expect("Unable to create Runtime");
 
@@ -763,9 +730,6 @@ fn microphone_as_stream() -> Receiver<Result<Bytes, RecvError>> {
 
 	async_rx
 }
-
-const GPT_3_5: &str = "gpt-3.5-turbo-0125";
-const GPT_4: &str = "gpt-4-0125-preview";
 
 pub(crate) async fn run_openai(
 	model: &str,
