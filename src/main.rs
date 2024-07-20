@@ -660,7 +660,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.with_min_inner_size([300.0, 220.0]),
 			..Default::default()
 		},
-		Box::new(|cc| Box::new(App::new(cc))),
+		Box::new(|cc| Ok(Box::new(App::new(cc)))),
 	)?;
 
 	Ok(())
