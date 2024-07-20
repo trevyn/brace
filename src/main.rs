@@ -8,15 +8,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
 use crossbeam::channel::RecvError;
-use deepgram::transcription::live::{Alternatives, Channel, Word as LiveWord};
-use deepgram::transcription::prerecorded::response::Word as PrerecordedWord;
-use deepgram::{
-	transcription::prerecorded::{
-		audio_source::AudioSource,
-		options::{Language, Options},
-	},
-	Deepgram, DeepgramError,
-};
 use egui::text::LayoutJob;
 use egui::*;
 use futures::channel::mpsc::{self, Receiver, Sender};
@@ -38,28 +29,6 @@ mod audiofile;
 mod self_update;
 mod session;
 
-enum Word {
-	Live(LiveWord),
-	Prerecorded(PrerecordedWord),
-}
-
-impl Word {
-	fn speaker(&self) -> usize {
-		match self {
-			Word::Live(word) => word.speaker as usize,
-			Word::Prerecorded(word) => word.speaker.unwrap(),
-		}
-	}
-	fn word(&self) -> &str {
-		match self {
-			Word::Live(word) => &word.word,
-			Word::Prerecorded(word) => &word.word,
-		}
-	}
-}
-
-static TRANSCRIPT: Lazy<Mutex<Vec<Option<LiveWord>>>> = Lazy::new(Default::default);
-static TRANSCRIPT_FINAL: Lazy<Mutex<Vec<Option<Word>>>> = Lazy::new(Default::default);
 static DURATION: Lazy<Mutex<f64>> = Lazy::new(Default::default);
 static COMPLETION: Lazy<Mutex<String>> = Lazy::new(Default::default);
 static COMPLETION_PROMPT: Lazy<Mutex<String>> = Lazy::new(|| {
@@ -208,33 +177,6 @@ pub struct App {
 }
 
 impl App {
-	fn get_transcript(&self) -> String {
-		let mut transcript: String = String::new();
-
-		let words = TRANSCRIPT_FINAL.lock().unwrap();
-
-		let lines = words.split(|word| word.is_none());
-
-		for line in lines {
-			let mut current_speaker = 100;
-
-			for word in line {
-				if let Some(word) = word {
-					if word.speaker() != current_speaker {
-						current_speaker = word.speaker();
-						transcript.push_str(&format!(
-							"\n[{}]: ",
-							self.speaker_names.get(current_speaker).unwrap_or(&String::new())
-						));
-					}
-					transcript.push_str(&format!("{} ", word.word()));
-				}
-			}
-		}
-		transcript.push('\n');
-		transcript
-	}
-
 	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		cc.egui_ctx.set_visuals(egui::style::Visuals::dark());
 		cc.egui_ctx.style_mut(|s| s.visuals.override_text_color = Some(Color32::WHITE));
@@ -383,156 +325,6 @@ impl eframe::App for App {
 				.changed()
 				.then(|| setting2.save());
 
-			for (i, session) in self.sessions.iter().enumerate() {
-				if ui.button(format!("Session {}: {} s", i, session.duration_ms() as f32 / 1000.0)).clicked() {
-					let samples = session.samples();
-
-					tokio::spawn(async move {
-						// clear transcript
-						TRANSCRIPT_FINAL.lock().unwrap().clear();
-
-						// dbg!(session.samples().len());
-						audiofile::save_wav_file(samples);
-
-						let dg_client = Deepgram::new(Setting::get("deepgram_api_key").value);
-
-						let file = File::open("temp_audio.aac").await.unwrap();
-
-						let source = AudioSource::from_buffer_with_mime_type(file, "audio/aac");
-
-						let options = Options::builder()
-							.punctuate(false)
-							.diarize(true)
-							.model(deepgram::transcription::prerecorded::options::Model::CustomId(
-								"nova-2-meeting".to_string(),
-							))
-							.build();
-
-						eprintln!("transcribing...");
-						let response: deepgram::transcription::prerecorded::response::Response = dg_client
-							.transcription()
-							.make_prerecorded_request_builder(source, &options)
-							.query(&[("filler_words", "true")])
-							.send()
-							.await
-							.unwrap()
-							.json()
-							.await
-							.unwrap();
-
-						// let response = dg_client.transcription().prerecorded(source, &options).await.unwrap();
-						eprintln!("complete.");
-						// dbg!(&response);
-
-						let transcript = &response.results.channels[0].alternatives[0].transcript;
-						println!("{}", transcript);
-
-						let words = &response.results.channels[0].alternatives[0].words;
-
-						for word in words.iter() {
-							TRANSCRIPT_FINAL.lock().unwrap().push(Some(Word::Prerecorded(word.clone())));
-						}
-					});
-					// samples is single-channel f32 little endian
-					// make into mp3 file
-				}
-			}
-
-			if ui
-				.add_enabled(
-					!self.is_recording,
-					Button::new(if self.is_recording { "recording..." } else { "record" }),
-				)
-				.clicked()
-			{
-				self.is_recording = true;
-				self.sessions.push(session::Session { start_ms: now_ms(), end_ms: i64::MAX });
-				tokio::spawn(async {
-					println!("transcription starting...");
-
-					let dg = Deepgram::new(Setting::get("deepgram_api_key").value);
-
-					let mut results = dg
-						.transcription()
-						.stream_request()
-						.stream(microphone_as_stream())
-						.encoding("linear16".to_string())
-						.sample_rate(44100)
-						.channels(1)
-						.start()
-						.await
-						.unwrap();
-
-					println!("transcription started");
-
-					while let Some(result) = results.next().await {
-						// println!("got: {:?}", result);
-						{
-							if let Ok(deepgram::transcription::live::StreamResponse::TranscriptResponse {
-								duration,
-								is_final,
-								channel: Channel { mut alternatives, .. },
-								..
-							}) = result
-							{
-								if !is_final {
-									*DURATION.lock().unwrap() += duration;
-								}
-
-								if let Some(deepgram::transcription::live::Alternatives { words, .. }) =
-									alternatives.first_mut()
-								{
-									for word in words.iter() {
-										TRANSCRIPT.lock().unwrap().push(Some(word.clone()));
-									}
-									TRANSCRIPT.lock().unwrap().push(None);
-
-									if is_final {
-										for word in words {
-											TRANSCRIPT_FINAL.lock().unwrap().push(Some(Word::Live(word.clone())));
-										}
-										TRANSCRIPT_FINAL.lock().unwrap().push(None);
-									}
-								}
-							}
-						}
-					}
-				});
-			}
-
-			if ui.button("import audio file").clicked() {
-				tokio::spawn(async {
-					let file = rfd::AsyncFileDialog::new().pick_file().await.unwrap().read().await;
-
-					let source = AudioSource::from_buffer_with_mime_type(file, "audio/aac");
-
-					let options = Options::builder()
-						.punctuate(false)
-						.diarize(true)
-						.model(deepgram::transcription::prerecorded::options::Model::CustomId(
-							"nova-2-meeting".to_string(),
-						))
-						.build();
-
-					let dg_client = Deepgram::new(Setting::get("deepgram_api_key").value);
-
-					eprintln!("transcribing...");
-					let mut response = dg_client.transcription().prerecorded(source, &options).await.unwrap();
-					eprintln!("complete.");
-
-					TRANSCRIPT_FINAL.lock().unwrap().extend(
-						response.results.channels[0].alternatives[0]
-							.words
-							.drain(..)
-							.map(|w| Some(Word::Prerecorded(w))),
-					);
-				});
-			};
-
-			if ui.button("copy transcript to clipboard").clicked() {
-				ui.output_mut(|o| o.copied_text = self.get_transcript());
-			};
-
 			if ui.button("add window").clicked() {
 				WHEEL_WINDOWS.lock().unwrap().push(Default::default());
 			};
@@ -552,7 +344,7 @@ impl eframe::App for App {
 				});
 			}
 
-			ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+			ScrollArea::vertical().auto_shrink([false, false]).show(ui, |_ui| {
 				// let size = [ui.available_width(), ui.spacing().interact_size.y.max(20.0)];
 				// for card in cards {
 				// 	let i = card.rowid.unwrap();
@@ -561,31 +353,6 @@ impl eframe::App for App {
 				// 		self.line_selected = i;
 				// 	}
 				// }
-
-				let words = TRANSCRIPT.lock().unwrap();
-
-				let lines = words.split(|word| word.is_none());
-
-				for line in lines {
-					ui.horizontal_wrapped(|ui| {
-						for word in line {
-							if let Some(word) = word {
-								let color = match word.speaker {
-									0 => Color32::RED,
-									1 => Color32::GREEN,
-									2 => Color32::BLUE,
-									3 => Color32::YELLOW,
-									4 => Color32::LIGHT_GRAY,
-									5 => Color32::DARK_RED,
-									6 => Color32::DARK_GREEN,
-									7 => Color32::BLACK,
-									_ => Color32::WHITE,
-								};
-								ui.label(egui::RichText::new(word.word.clone()).color(color).size(15.0));
-							}
-						}
-					});
-				}
 			});
 		});
 
@@ -607,8 +374,7 @@ impl eframe::App for App {
 			egui::Window::new(format!("wheel {}", i)).show(ctx, |ui| {
 				ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
 					if ui.button("copy all to clipboard").clicked() {
-						let mut text = self.get_transcript();
-						text.push_str("\n");
+						let mut text = "\n".to_string();
 
 						for entry in WHEEL_WINDOWS.lock().unwrap().get(i).unwrap().0.iter() {
 							text.push_str(&format!("[{}]: {}\n", entry.role, entry.content));
@@ -714,12 +480,11 @@ impl eframe::App for App {
 						messages.push(ChatMessage { role: User, content: String::new() });
 						ui.ctx().memory_mut(|m| m.request_focus(Id::new((i * 1000) + messages.len() - 1)));
 						let id = messages.len() - 2;
-						let transcript = self.get_transcript();
 						let ctx_cloned = ctx.clone();
 						let (trigger, tripwire) = Tripwire::new();
 						self.trigger = Some(trigger);
 						tokio::spawn(async move {
-							run_openai(GPT_4, tripwire, orig_messages, transcript, move |content| {
+							run_openai(GPT_4, tripwire, orig_messages, move |content| {
 								WHEEL_WINDOWS
 									.lock()
 									.unwrap()
@@ -740,43 +505,6 @@ impl eframe::App for App {
 			});
 		}
 
-		egui::Window::new("Transcript").show(ctx, |ui| {
-			ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
-				let words = TRANSCRIPT_FINAL.lock().unwrap();
-
-				let lines = words.split(|word| word.is_none());
-
-				for line in lines {
-					let mut current_speaker = 100;
-
-					ui.horizontal_wrapped(|ui| {
-						for word in line {
-							if let Some(word) = word {
-								if word.speaker() != current_speaker {
-									current_speaker = word.speaker();
-									while current_speaker >= self.speaker_names.len() {
-										self.speaker_names.push(format!("{}", current_speaker));
-									}
-									ui.end_row();
-									ui.horizontal_wrapped(|ui| {
-										ui.label(
-											RichText::new(format!(
-												"[{}]: ",
-												self.speaker_names.get(current_speaker).unwrap_or(&String::new())
-											))
-											.size(30.0),
-										);
-									});
-								}
-								ui.label(RichText::new(word.word()).size(30.0));
-								// ui.add(Label::new(RichText::new(word.word.clone()).color(color).size(30.0)).wrap(true));
-							}
-						}
-					});
-				}
-			});
-			// ui.allocate_space(ui.available_size());
-		});
 		CentralPanel::default().show(ctx, |_ui| {});
 	}
 }
@@ -1043,7 +771,6 @@ pub(crate) async fn run_openai(
 	model: &str,
 	tripwire: Tripwire,
 	messages: Vec<ChatMessage>,
-	transcript: String,
 	callback: impl Fn(&String) + Send + 'static,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	use async_openai::{types::CreateChatCompletionRequestArgs, Client};
@@ -1053,7 +780,7 @@ pub(crate) async fn run_openai(
 		async_openai::config::OpenAIConfig::new().with_api_key(Setting::get("openai_api_key").value),
 	);
 
-	let mut messages = messages
+	let messages = messages
 		.into_iter()
 		.map(|m| match m.role {
 			System => async_openai::types::ChatCompletionRequestSystemMessageArgs::default()
@@ -1075,16 +802,16 @@ pub(crate) async fn run_openai(
 		})
 		.collect::<Vec<ChatCompletionRequestMessage>>();
 
-	if !transcript.is_empty() {
-		messages.insert(
-			0,
-			async_openai::types::ChatCompletionRequestUserMessageArgs::default()
-				.content(transcript)
-				.build()
-				.unwrap()
-				.into(),
-		);
-	}
+	// if !transcript.is_empty() {
+	// 	messages.insert(
+	// 		0,
+	// 		async_openai::types::ChatCompletionRequestUserMessageArgs::default()
+	// 			.content(transcript)
+	// 			.build()
+	// 			.unwrap()
+	// 			.into(),
+	// 	);
+	// }
 
 	// dbg!(&messages);
 
