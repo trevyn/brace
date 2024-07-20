@@ -437,11 +437,11 @@ impl eframe::App for App {
 								.changed()
 							{
 								// eprintln!("{}", entry.content);
-								let debounce_tx = self.debounce_tx.clone();
-								let entry_content = entry.content.clone();
-								tokio::spawn(async move {
-									debounce_tx.unwrap().send(entry_content).await.unwrap();
-								});
+								// let debounce_tx = self.debounce_tx.clone();
+								// let entry_content = entry.content.clone();
+								// tokio::spawn(async move {
+								// 	debounce_tx.unwrap().send(entry_content).await.unwrap();
+								// });
 							};
 							// if ui.button("remove").clicked() {
 							// 	WHEEL_WINDOWS.lock().unwrap().get_mut(i).unwrap().0.remove(j);
@@ -781,7 +781,7 @@ pub(crate) async fn run_openai(
 
 	let request = CreateChatCompletionRequestArgs::default()
 		.model(model)
-		.max_tokens(4096u16)
+		.max_tokens(16384u16)
 		.messages(messages)
 		.build()?;
 
