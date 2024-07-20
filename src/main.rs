@@ -179,7 +179,7 @@ impl App {
 
 		egui_extras::install_image_loaders(&cc.egui_ctx);
 
-		let (debounce_tx, mut debounce_rx) = mpsc::channel(10);
+		let (debounce_tx, mut _debounce_rx) = mpsc::channel(10);
 
 		let s = Self {
 			debounce_tx: Some(debounce_tx),
@@ -198,53 +198,53 @@ impl App {
 			}
 		});
 
-		let ctx = cc.egui_ctx.clone();
+		// let ctx = cc.egui_ctx.clone();
 
 		// Listen for events
-		tokio::spawn(async move {
-			let duration = Duration::from_millis(300);
-			let mut keys_pressed = false;
-			let mut string = String::new();
-			let mut _trigger = None;
+		// tokio::spawn(async move {
+		// 	let duration = Duration::from_millis(300);
+		// 	let mut keys_pressed = false;
+		// 	let mut string = String::new();
+		// 	let mut _trigger = None;
 
-			loop {
-				match tokio::time::timeout(duration, debounce_rx.next()).await {
-					Ok(Some(s)) => {
-						// keyboard activity
-						_trigger = None;
-						COMPLETION.lock().unwrap().clear();
-						string = s;
-						keys_pressed = true;
-					}
-					Ok(None) => {
-						eprintln!("Debounce finished");
-						break;
-					}
-					Err(_) => {
-						if keys_pressed && !string.is_empty() {
-							// eprintln!("{:?} since keyboard activity: {}", duration, &string);
-							let (t, tripwire) = Tripwire::new();
-							_trigger = Some(t);
-							eprintln!("{}", string);
-							let string = format!("{} {}", COMPLETION_PROMPT.lock().unwrap(), string);
-							let ctx = ctx.clone();
-							tokio::spawn(async move {
-								COMPLETION.lock().unwrap().clear();
-								let ctx = ctx.clone();
-								run_openai_completion(tripwire, string, move |content| {
-									// eprint!("{}", content);
-									COMPLETION.lock().unwrap().push_str(&content);
-									ctx.request_repaint();
-								})
-								.await
-								.ok();
-							});
-							keys_pressed = false;
-						}
-					}
-				}
-			}
-		});
+		// 	loop {
+		// 		match tokio::time::timeout(duration, debounce_rx.next()).await {
+		// 			Ok(Some(s)) => {
+		// 				// keyboard activity
+		// 				_trigger = None;
+		// 				COMPLETION.lock().unwrap().clear();
+		// 				string = s;
+		// 				keys_pressed = true;
+		// 			}
+		// 			Ok(None) => {
+		// 				eprintln!("Debounce finished");
+		// 				break;
+		// 			}
+		// 			Err(_) => {
+		// 				if keys_pressed && !string.is_empty() {
+		// 					// eprintln!("{:?} since keyboard activity: {}", duration, &string);
+		// 					let (t, tripwire) = Tripwire::new();
+		// 					_trigger = Some(t);
+		// 					eprintln!("{}", string);
+		// 					let string = format!("{} {}", COMPLETION_PROMPT.lock().unwrap(), string);
+		// 					let ctx = ctx.clone();
+		// 					tokio::spawn(async move {
+		// 						COMPLETION.lock().unwrap().clear();
+		// 						let ctx = ctx.clone();
+		// 						run_openai_completion(tripwire, string, move |content| {
+		// 							// eprint!("{}", content);
+		// 							COMPLETION.lock().unwrap().push_str(&content);
+		// 							ctx.request_repaint();
+		// 						})
+		// 						.await
+		// 						.ok();
+		// 					});
+		// 					keys_pressed = false;
+		// 				}
+		// 			}
+		// 		}
+		// 	}
+		// });
 
 		// dbg!(&sessions);
 		// let session = sessions.first().unwrap();
