@@ -284,6 +284,16 @@ impl MyThings for Ui {
 
 impl eframe::App for App {
 	fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+		let mut request_focus = None;
+		ctx.input(|i| {
+			if i.key_pressed(Key::N) && i.modifiers.command {
+				let mut wheel_windows = WHEEL_WINDOWS.lock().unwrap();
+				let len = wheel_windows.len();
+				wheel_windows.push(Default::default());
+				request_focus = Some(len * 1000);
+			}
+			if i.key_pressed(Key::W) && i.modifiers.command {}
+		});
 		// ctx.input(|i| {
 		// 	if i.key_pressed(Key::ArrowDown) {
 		// 		self.line_selected =
@@ -450,6 +460,10 @@ impl eframe::App for App {
 						});
 					}
 					ui.label("[command-enter to send]");
+
+					if let Some(id) = request_focus {
+						ui.ctx().memory_mut(|m| m.request_focus(Id::new(id)))
+					};
 
 					if do_it {
 						let ref mut messages = window.messages;
