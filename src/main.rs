@@ -39,11 +39,14 @@ struct ChatMessage {
 	content: String,
 }
 
-struct WheelWindow(Vec<ChatMessage>);
+struct WheelWindow {
+	open: bool,
+	messages: Vec<ChatMessage>,
+}
 
 impl Default for WheelWindow {
 	fn default() -> Self {
-		Self(vec![ChatMessage { role: User, content: String::new() }])
+		Self { open: true, messages: vec![ChatMessage { role: User, content: String::new() }] }
 	}
 }
 
@@ -350,25 +353,23 @@ impl eframe::App for App {
 			}
 		});
 
-		let len = WHEEL_WINDOWS.lock().unwrap().len();
-		for i in 0..len {
-			egui::Window::new(format!("wheel {}", i)).show(ctx, |ui| {
+		for (window_num, window) in WHEEL_WINDOWS.lock().unwrap().iter_mut().enumerate() {
+			egui::Window::new(format!("wheel {}", window_num)).open(&mut window.open).show(ctx, |ui| {
 				ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
 					if ui.button("copy all to clipboard").clicked() {
 						let mut text = "\n".to_string();
 
-						for entry in WHEEL_WINDOWS.lock().unwrap().get(i).unwrap().0.iter() {
+						for entry in window.messages.iter() {
 							text.push_str(&format!("[{}]: {}\n", entry.role, entry.content));
 						}
 
 						ui.output_mut(|o| o.copied_text = text);
 					}
 					ui.label("[transcript goes here]");
-					let mut wheel_windows = WHEEL_WINDOWS.lock().unwrap();
 					let mut do_it = false;
 					let mut do_it_j = 9999;
-					for (j, entry) in wheel_windows.get_mut(i).unwrap().0.iter_mut().enumerate() {
-						let id = Id::new(i * 1000 + j);
+					for (j, entry) in window.messages.iter_mut().enumerate() {
+						let id = Id::new(window_num * 1000 + j);
 						let editor_has_focus = ui.ctx().memory(|m| m.has_focus(id));
 
 						if editor_has_focus && ui.input_mut(|i| i.consume_key(Modifiers::default(), Key::Tab)) {
@@ -451,7 +452,7 @@ impl eframe::App for App {
 					ui.label("[command-enter to send]");
 
 					if do_it {
-						let ref mut messages = wheel_windows.get_mut(i).unwrap().0;
+						let ref mut messages = window.messages;
 						messages.truncate(do_it_j + 1);
 						Prompt { rowid: None, time_ms: now_ms(), prompt: messages.last().unwrap().content.clone() }
 							.insert()
@@ -459,7 +460,7 @@ impl eframe::App for App {
 						let orig_messages = messages.clone();
 						messages.push(ChatMessage { role: Assistant, content: String::new() });
 						messages.push(ChatMessage { role: User, content: String::new() });
-						ui.ctx().memory_mut(|m| m.request_focus(Id::new((i * 1000) + messages.len() - 1)));
+						ui.ctx().memory_mut(|m| m.request_focus(Id::new((window_num * 1000) + messages.len() - 1)));
 						let id = messages.len() - 2;
 						let ctx_cloned = ctx.clone();
 						let (trigger, tripwire) = Tripwire::new();
@@ -469,9 +470,9 @@ impl eframe::App for App {
 								WHEEL_WINDOWS
 									.lock()
 									.unwrap()
-									.get_mut(i)
+									.get_mut(window_num)
 									.unwrap()
-									.0
+									.messages
 									.get_mut(id)
 									.unwrap()
 									.content
