@@ -32,7 +32,7 @@ serde_json = "1"
 stream-cancel = "0.8"
 tokio = {version = "1", features = ["full"]}
 tracked = "0.5"
-turbosql = {git = "https://github.com/trevyn/turbosql", branch = "main"}
+turbosql = {git = "https://github.com/trevyn/turbosql", branch = "toml-mismatch"}
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
