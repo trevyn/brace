@@ -41,12 +41,17 @@ struct ChatMessage {
 
 struct WheelWindow {
 	open: bool,
+	request_close: bool,
 	messages: Vec<ChatMessage>,
 }
 
 impl Default for WheelWindow {
 	fn default() -> Self {
-		Self { open: true, messages: vec![ChatMessage { role: User, content: String::new() }] }
+		Self {
+			open: true,
+			request_close: false,
+			messages: vec![ChatMessage { role: User, content: String::new() }],
+		}
 	}
 }
 
@@ -285,6 +290,7 @@ impl MyThings for Ui {
 impl eframe::App for App {
 	fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
 		let mut request_focus = None;
+		let mut request_close = false;
 		ctx.input(|i| {
 			if i.key_pressed(Key::N) && i.modifiers.command {
 				let mut wheel_windows = WHEEL_WINDOWS.lock().unwrap();
@@ -292,7 +298,9 @@ impl eframe::App for App {
 				wheel_windows.push(Default::default());
 				request_focus = Some(len * 1000);
 			}
-			if i.key_pressed(Key::W) && i.modifiers.command {}
+			if i.key_pressed(Key::W) && i.modifiers.command {
+				request_close = true;
+			}
 		});
 		// ctx.input(|i| {
 		// 	if i.key_pressed(Key::ArrowDown) {
@@ -364,7 +372,14 @@ impl eframe::App for App {
 		});
 
 		for (window_num, window) in WHEEL_WINDOWS.lock().unwrap().iter_mut().enumerate() {
+			if window.request_close {
+				window.open = false;
+			}
 			egui::Window::new(format!("wheel {}", window_num)).open(&mut window.open).show(ctx, |ui| {
+				if request_close && Some(ui.layer_id()) == ui.ctx().top_layer_id() {
+					window.request_close = true;
+				}
+
 				ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
 					if ui.button("copy all to clipboard").clicked() {
 						let mut text = "\n".to_string();
