@@ -356,19 +356,6 @@ impl eframe::App for App {
 				.changed()
 				.then(|| setting2.save());
 
-			if ui.button("add window").clicked() {
-				WHEEL_WINDOWS.lock().unwrap().push(Default::default());
-			};
-
-			for name in self.speaker_names.iter_mut() {
-				ui.horizontal(|ui| {
-					// ui.label(format!("Speaker {}", i + 1));
-					ui.add(TextEdit::singleline(name).desired_width(f32::INFINITY)).changed().then(|| {
-						// self.speaker_names[i] = name.clone();
-					});
-				});
-			}
-
 			ScrollArea::vertical().auto_shrink([false, false]).show(ui, |_ui| {
 				// let size = [ui.available_width(), ui.spacing().interact_size.y.max(20.0)];
 				// for card in cards {
@@ -379,19 +366,6 @@ impl eframe::App for App {
 				// 	}
 				// }
 			});
-		});
-
-		egui::Window::new("").show(ctx, |ui| {
-			if ui
-				.add(
-					TextEdit::multiline(&mut self.completion_prompt)
-						.font(FontId::new(20.0, FontFamily::Monospace))
-						.desired_width(f32::INFINITY),
-				)
-				.changed()
-			{
-				*COMPLETION_PROMPT.lock().unwrap() = self.completion_prompt.clone();
-			}
 		});
 
 		for (window_num, window) in WHEEL_WINDOWS.lock().unwrap().iter_mut().enumerate() {
@@ -663,6 +637,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	eprintln!("database at {:?}", turbosql::db_path());
 
 	self_update::self_update().await.ok();
+
+	if let Some(document) = select!(Option<Document> "ORDER BY timestamp_ms DESC LIMIT 1")? {
+		WHEEL_WINDOWS.lock().unwrap().push(WheelWindow {
+			messages: vec![ChatMessage { role: User, content: document.content }],
+			..Default::default()
+		});
+	}
 
 	// Ok(())
 	// let rt = tokio::runtime::Runtime::new().expect("Unable to create Runtime");
