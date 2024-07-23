@@ -36,7 +36,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
-        rust: [stable, beta]
+        rust: [nightly]
 
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
         if: ${{ matrix.os == 'windows-latest' }}
 
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.rust == 'stable' }}
+        if: ${{ matrix.rust == 'nightly' }}
         with:
           name: ${{ matrix.os }}
           path: brace

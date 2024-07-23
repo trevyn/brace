@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![allow(unused_imports, dead_code)]
-// #![feature(let_chains)]
+#![feature(let_chains)]
 
 use async_openai::types::ChatCompletionRequestMessage;
 use async_openai::types::Role::{self, *};
@@ -79,13 +79,6 @@ impl Setting {
 }
 
 #[derive(Turbosql, Default)]
-struct SampleData {
-	rowid: Option<i64>,
-	record_ms: i64,
-	sample_data: Blob,
-}
-
-#[derive(Turbosql, Default)]
 struct Card {
 	rowid: Option<i64>,
 	deleted: bool,
@@ -117,10 +110,25 @@ struct CardLog {
 }
 
 #[derive(Turbosql, Default)]
+struct SampleData {
+	rowid: Option<i64>,
+	record_ms: i64,
+	sample_data: Blob,
+}
+
+#[derive(Turbosql, Default)]
 struct Prompt {
 	rowid: Option<i64>,
 	time_ms: i64,
 	prompt: String,
+}
+
+#[derive(Turbosql, Default)]
+struct Document {
+	rowid: Option<i64>,
+	title: String,
+	content: String,
+	timestamp_ms: i64,
 }
 
 struct Resource {
@@ -300,6 +308,21 @@ impl eframe::App for App {
 			}
 			if i.key_pressed(Key::W) && i.modifiers.command {
 				request_close = true;
+			}
+			if i.key_pressed(Key::S) && i.modifiers.command {
+				let wheel_windows = WHEEL_WINDOWS.lock().unwrap();
+				if let Some(window) = wheel_windows.get(0)
+					&& let Some(message) = window.messages.get(0)
+				{
+					Document {
+						rowid: None,
+						title: "primary".into(),
+						content: message.content.clone(),
+						timestamp_ms: now_ms(),
+					}
+					.insert()
+					.unwrap();
+				}
 			}
 		});
 		// ctx.input(|i| {
