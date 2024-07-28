@@ -2,8 +2,10 @@
 #![allow(unused_imports, dead_code)]
 #![feature(let_chains)]
 
-use async_openai::types::ChatCompletionRequestMessage;
 use async_openai::types::Role::{self, *};
+use async_openai::types::{
+	ChatCompletionRequestMessage, ChatCompletionToolArgs, ChatCompletionToolType, FunctionObjectArgs,
+};
 use bytes::{BufMut, Bytes, BytesMut};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Sample;
@@ -16,6 +18,7 @@ use futures::SinkExt;
 use once_cell::sync::Lazy;
 use poll_promise::Promise;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::thread;
@@ -817,11 +820,32 @@ pub(crate) async fn run_openai(
 		.model(model)
 		.max_tokens(16384u16)
 		.messages(messages)
+		// .tools(vec![ChatCompletionToolArgs::default()
+		// 	.r#type(ChatCompletionToolType::Function)
+		// 	.function(
+		// 		FunctionObjectArgs::default()
+		// 			.name("get_current_weather")
+		// 			.description("Get the current weather in a given location")
+		// 			.parameters(json!({
+		// 							"type": "object",
+		// 							"properties": {
+		// 											"location": {
+		// 															"type": "string",
+		// 															"description": "The city and state, e.g. San Francisco, CA",
+		// 											},
+		// 											"unit": { "type": "string", "enum": ["celsius", "fahrenheit"] },
+		// 							},
+		// 							"required": ["location"],
+		// 			}))
+		// 			.build()?,
+		// 	)
+		// 	.build()?])
 		.build()?;
 
 	let mut stream = client.chat().create_stream(request).await?.take_until_if(tripwire);
 
 	while let Some(result) = stream.next().await {
+		// dbg!(&result);
 		match result {
 			Ok(response) => {
 				response.choices.iter().for_each(|chat_choice| {
