@@ -46,10 +46,6 @@ codegen-units = 1
 lto = true
 
 [patch.crates-io]
-# If you want to use the bleeding edge version of egui and eframe:
-# egui = { git = "https://github.com/emilk/egui", branch = "master" }
-# eframe = { git = "https://github.com/emilk/egui", branch = "master" }
-
-# If you fork https://github.com/emilk/egui you can test with:
-# egui = { path = "../egui/crates/egui" }
-# eframe = { path = "../egui/crates/eframe" }
+eframe = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
+egui = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
+egui_extras = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
