@@ -196,7 +196,6 @@ pub struct App {
 impl App {
 	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
 		cc.egui_ctx.set_visuals(egui::style::Visuals::dark());
-		cc.egui_ctx.style_mut(|s| s.visuals.override_text_color = Some(Color32::WHITE));
 
 		egui_extras::install_image_loaders(&cc.egui_ctx);
 
@@ -437,7 +436,7 @@ impl eframe::App for App {
 									0.0,
 									TextFormat {
 										font_id: FontId::new(20.0, FontFamily::Monospace),
-										color: Color32::WHITE,
+										color: if entry.role == Assistant { Color32::LIGHT_BLUE } else { Color32::LIGHT_GRAY },
 										..Default::default()
 									},
 								);
