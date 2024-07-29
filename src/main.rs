@@ -189,6 +189,8 @@ pub struct App {
 	is_recording: bool,
 	#[serde(skip)]
 	promise: Option<Promise<ehttp::Result<Resource>>>,
+	#[serde(skip)]
+	tokenizer: Option<tiktoken_rs::CoreBPE>,
 }
 
 impl App {
@@ -204,6 +206,7 @@ impl App {
 			debounce_tx: Some(debounce_tx),
 			sessions: session::Session::calculate_sessions(),
 			completion_prompt: COMPLETION_PROMPT.lock().unwrap().clone(),
+			tokenizer: Some(tiktoken_rs::o200k_base().unwrap()),
 			..Default::default()
 		};
 
@@ -473,7 +476,10 @@ impl eframe::App for App {
 							// 	WHEEL_WINDOWS.lock().unwrap().get_mut(i).unwrap().0.remove(j);
 							// }
 						});
+						let tokens = self.tokenizer.as_ref().unwrap().encode_with_special_tokens(&entry.content);
+						ui.label(format!("{} tokens", tokens.len()));
 					}
+
 					ui.label("[command-enter to send]");
 
 					if let Some(id) = request_focus {
