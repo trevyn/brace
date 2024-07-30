@@ -395,6 +395,7 @@ impl eframe::App for App {
 					ui.label("[transcript goes here]");
 					let mut do_it = false;
 					let mut do_it_j = 9999;
+					let mut total_tokens = 0;
 					for (j, entry) in window.messages.iter_mut().enumerate() {
 						let id = Id::new(window_num * 1000 + j);
 						let editor_has_focus = ui.ctx().memory(|m| m.has_focus(id));
@@ -482,9 +483,17 @@ impl eframe::App for App {
 							// }
 						});
 						ui.label(format!("{} tokens", entry.token_count));
+						total_tokens += entry.token_count;
 					}
 
-					ui.label("[command-enter to send]");
+					ui.label(
+						egui::RichText::new(format!(
+							"{} total tokens ({} cents) [command-enter to send]",
+							total_tokens,
+							((total_tokens * 15) as f64 / 1_000_000f64)
+						))
+						.color(Color32::WHITE),
+					);
 
 					if let Some(id) = request_focus {
 						ui.ctx().memory_mut(|m| m.request_focus(Id::new(id)))
