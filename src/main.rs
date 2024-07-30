@@ -176,6 +176,7 @@ pub struct App {
 	system_text: String,
 	prompt_text: String,
 	completion_prompt: String,
+	saved_version: String,
 
 	#[serde(skip)]
 	debounce_tx: Option<Sender<String>>,
@@ -206,6 +207,10 @@ impl App {
 			sessions: session::Session::calculate_sessions(),
 			completion_prompt: COMPLETION_PROMPT.lock().unwrap().clone(),
 			tokenizer: Some(tiktoken_rs::o200k_base().unwrap()),
+			saved_version: select!(Option<Document> "ORDER BY timestamp_ms DESC LIMIT 1")
+				.unwrap()
+				.unwrap_or_default()
+				.content,
 			..Default::default()
 		};
 
@@ -327,6 +332,7 @@ impl eframe::App for App {
 					}
 					.insert()
 					.unwrap();
+					self.saved_version = message.content.clone();
 				}
 			}
 		});
@@ -353,6 +359,15 @@ impl eframe::App for App {
 
 		SidePanel::left("left_panel").show(ctx, |ui| {
 			ui.label(option_env!("BUILD_ID").unwrap_or("DEV"));
+
+			let wheel_windows = WHEEL_WINDOWS.lock().unwrap();
+			if let Some(window) = wheel_windows.get(0)
+				&& let Some(message) = window.messages.get(0)
+			{
+				if self.saved_version == message.content {
+					ui.label("SAVED");
+				}
+			}
 
 			let mut setting2 = Setting::get("openai_api_key");
 			ui.label("openai api key:");
@@ -436,7 +451,11 @@ impl eframe::App for App {
 									0.0,
 									TextFormat {
 										font_id: FontId::new(20.0, FontFamily::Monospace),
-										color: if entry.role == Assistant { Color32::LIGHT_BLUE } else { Color32::LIGHT_GRAY },
+										color: if entry.role == Assistant {
+											Color32::from_rgb(0xCD, 0xD8, 0xFF)
+										} else {
+											Color32::from_rgb(230, 230, 230)
+										},
 										..Default::default()
 									},
 								);
