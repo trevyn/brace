@@ -20,7 +20,7 @@ use turbosql::*;
 
 mod audiofile;
 mod self_update;
-mod session;
+// mod session;
 
 static TOKENIZER: Lazy<Mutex<tiktoken_rs::CoreBPE>> =
 	Lazy::new(|| Mutex::new(tiktoken_rs::o200k_base().unwrap()));
@@ -71,44 +71,6 @@ impl Setting {
 			self.insert().unwrap();
 		}
 	}
-}
-
-#[derive(Turbosql, Default)]
-struct Card {
-	rowid: Option<i64>,
-	deleted: bool,
-	title: String,
-	question: String,
-	answer: String,
-	last_question_viewed_ms: i64,
-	last_answer_viewed_ms: i64,
-}
-
-#[allow(clippy::enum_variant_names)]
-#[derive(Serialize, Deserialize, Default)]
-enum Action {
-	#[default]
-	NoAction,
-	ViewedQuestion,
-	ViewedAnswer,
-	Responded {
-		correct: bool,
-	},
-}
-
-#[derive(Turbosql, Default)]
-struct CardLog {
-	rowid: Option<i64>,
-	card_id: i64,
-	time_ms: i64,
-	action: Action,
-}
-
-#[derive(Turbosql, Default)]
-struct SampleData {
-	rowid: Option<i64>,
-	record_ms: i64,
-	sample_data: Blob,
 }
 
 #[derive(Turbosql, Default)]
@@ -169,8 +131,8 @@ pub struct App {
 	gpt_3_trigger: Option<Trigger>,
 	#[serde(skip)]
 	trigger: Option<Trigger>,
-	#[serde(skip)]
-	sessions: Vec<session::Session>,
+	// #[serde(skip)]
+	// sessions: Vec<session::Session>,
 	#[serde(skip)]
 	is_recording: bool,
 	#[serde(skip)]
@@ -189,7 +151,7 @@ impl App {
 
 		let s = Self {
 			debounce_tx: Some(debounce_tx),
-			sessions: session::Session::calculate_sessions(),
+			// sessions: session::Session::calculate_sessions(),
 			completion_prompt: COMPLETION_PROMPT.lock().unwrap().clone(),
 			tokenizer: Some(tiktoken_rs::o200k_base().unwrap()),
 			saved_version: select!(Option<Document> "ORDER BY timestamp_ms DESC LIMIT 1")
@@ -321,26 +283,6 @@ impl eframe::App for App {
 				}
 			}
 		});
-		// ctx.input(|i| {
-		// 	if i.key_pressed(Key::ArrowDown) {
-		// 		self.line_selected =
-		// 			select!(i64 "MIN(rowid) FROM card WHERE NOT deleted AND rowid > " self.line_selected)
-		// 				.unwrap_or(self.line_selected);
-		// 	} else if i.key_pressed(Key::ArrowUp) {
-		// 		self.line_selected =
-		// 			select!(i64 "MAX(rowid) FROM card WHERE NOT deleted AND rowid < " self.line_selected)
-		// 				.unwrap_or(self.line_selected);
-		// 	} else if i.key_pressed(Key::Enter) {
-		// 		Card::default().insert().unwrap();
-		// 	} else if i.key_pressed(Key::Backspace) {
-		// 		let _ = update!("card SET deleted = 1 WHERE rowid = " self.line_selected);
-		// 		self.line_selected =
-		// 			select!(i64 "MIN(rowid) FROM card WHERE NOT deleted AND rowid > " self.line_selected)
-		// 				.unwrap_or(0);
-		// 	}
-		// });
-
-		// let cards = select!(Vec<Card> "WHERE NOT deleted").unwrap();
 
 		SidePanel::left("left_panel").show(ctx, |ui| {
 			ui.label(option_env!("BUILD_ID").unwrap_or("DEV"));
@@ -382,7 +324,7 @@ impl eframe::App for App {
 					window.request_close = true;
 				}
 
-				ScrollArea::vertical().stick_to_bottom(true).auto_shrink([false, false]).show(ui, |ui| {
+				ScrollArea::vertical().show(ui, |ui| {
 					if ui.button("copy all to clipboard").clicked() {
 						let mut text = "\n".to_string();
 
@@ -392,7 +334,6 @@ impl eframe::App for App {
 
 						ui.output_mut(|o| o.copied_text = text);
 					}
-					ui.label("[transcript goes here]");
 					let mut do_it = false;
 					let mut do_it_j = 9999;
 					let mut total_tokens = 0;
@@ -494,6 +435,14 @@ impl eframe::App for App {
 						))
 						.color(Color32::WHITE),
 					);
+
+					let extra_space = ui.clip_rect().height() - 300.0;
+					if extra_space > 5.0 {
+						let response = ui.allocate_space(egui::Vec2::new(ui.available_width(), extra_space));
+						if do_it {
+							ui.scroll_to_rect(response.1, Some(Align::TOP))
+						}
+					}
 
 					if let Some(id) = request_focus {
 						ui.ctx().memory_mut(|m| m.request_focus(Id::new(id)))
