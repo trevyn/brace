@@ -31,14 +31,11 @@ rfd = "0.14"
 serde = {version = "1.0.196", features = ["derive"]}
 serde_json = "1"
 stream-cancel = "0.8"
-tetra = "0.8"
+tetra = {version = "0.8", features = ["sdl2_bundled"]}
 tiktoken-rs = "0.5.9"
 tokio = {version = "1", features = ["full"]}
 tracked = "0.5"
 turbosql = "0.11"
-
-[target.'cfg(windows)'.dependencies]
-tetra = {version = "0.8", features = ["sdl2_bundled"]}
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
@@ -55,3 +52,4 @@ lto = true
 # eframe = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
 egui = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
 egui_extras = {git = "https://github.com/trevyn/egui", branch = "multiclick-text-select"}
+tetra = {git = "https://github.com/17cupsofcoffee/tetra", branch = "main"}
