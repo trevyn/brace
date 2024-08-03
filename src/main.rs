@@ -142,10 +142,10 @@ pub struct App {
 }
 
 impl App {
-	pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-		cc.egui_ctx.set_visuals(egui::style::Visuals::dark());
+	pub fn new() -> Self {
+		// cc.egui_ctx.set_visuals(egui::style::Visuals::dark());
 
-		egui_extras::install_image_loaders(&cc.egui_ctx);
+		// egui_extras::install_image_loaders(&cc.egui_ctx);
 
 		let (debounce_tx, mut _debounce_rx) = mpsc::channel(10);
 
@@ -161,74 +161,15 @@ impl App {
 			..Default::default()
 		};
 
-		let ctx_cloned = cc.egui_ctx.clone();
+		// let ctx_cloned = cc.egui_ctx.clone();
 
-		tokio::spawn(async move {
-			let mut interval = tokio::time::interval(Duration::from_millis(100));
-			loop {
-				interval.tick().await;
-				ctx_cloned.request_repaint();
-			}
-		});
-
-		// let ctx = cc.egui_ctx.clone();
-
-		// Listen for events
 		// tokio::spawn(async move {
-		// 	let duration = Duration::from_millis(300);
-		// 	let mut keys_pressed = false;
-		// 	let mut string = String::new();
-		// 	let mut _trigger = None;
-
+		// 	let mut interval = tokio::time::interval(Duration::from_millis(100));
 		// 	loop {
-		// 		match tokio::time::timeout(duration, debounce_rx.next()).await {
-		// 			Ok(Some(s)) => {
-		// 				// keyboard activity
-		// 				_trigger = None;
-		// 				COMPLETION.lock().unwrap().clear();
-		// 				string = s;
-		// 				keys_pressed = true;
-		// 			}
-		// 			Ok(None) => {
-		// 				eprintln!("Debounce finished");
-		// 				break;
-		// 			}
-		// 			Err(_) => {
-		// 				if keys_pressed && !string.is_empty() {
-		// 					// eprintln!("{:?} since keyboard activity: {}", duration, &string);
-		// 					let (t, tripwire) = Tripwire::new();
-		// 					_trigger = Some(t);
-		// 					eprintln!("{}", string);
-		// 					let string = format!("{} {}", COMPLETION_PROMPT.lock().unwrap(), string);
-		// 					let ctx = ctx.clone();
-		// 					tokio::spawn(async move {
-		// 						COMPLETION.lock().unwrap().clear();
-		// 						let ctx = ctx.clone();
-		// 						run_openai_completion(tripwire, string, move |content| {
-		// 							// eprint!("{}", content);
-		// 							COMPLETION.lock().unwrap().push_str(&content);
-		// 							ctx.request_repaint();
-		// 						})
-		// 						.await
-		// 						.ok();
-		// 					});
-		// 					keys_pressed = false;
-		// 				}
-		// 			}
-		// 		}
+		// 		interval.tick().await;
+		// 		ctx_cloned.request_repaint();
 		// 	}
 		// });
-
-		// dbg!(&sessions);
-		// let session = sessions.first().unwrap();
-		// dbg!(session.duration_ms());
-		// dbg!(session.samples().len());
-
-		// Load previous app state (if any).
-		// Note that you must enable the `persistence` feature for this to work.
-		// if let Some(storage) = cc.storage {
-		//     return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-		// }
 
 		s
 	}
@@ -252,11 +193,15 @@ impl MyThings for Ui {
 	}
 }
 
-impl eframe::App for App {
-	fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+impl egui_tetra2::State<Box<dyn std::error::Error>> for App {
+	fn ui(
+		&mut self,
+		_tetra_ctx: &mut tetra::Context,
+		egui_ctx: &egui::Context,
+	) -> Result<(), Box<dyn std::error::Error>> {
 		let mut request_focus = None;
 		let mut request_close = false;
-		ctx.input(|i| {
+		egui_ctx.input(|i| {
 			if i.key_pressed(Key::N) && i.modifiers.command {
 				let mut wheel_windows = WHEEL_WINDOWS.lock().unwrap();
 				let len = wheel_windows.len();
@@ -284,7 +229,7 @@ impl eframe::App for App {
 			}
 		});
 
-		SidePanel::left("left_panel").show(ctx, |ui| {
+		SidePanel::left("left_panel").show(egui_ctx, |ui| {
 			ui.label(option_env!("BUILD_ID").unwrap_or("DEV"));
 
 			let wheel_windows = WHEEL_WINDOWS.lock().unwrap();
@@ -319,7 +264,7 @@ impl eframe::App for App {
 			if window.request_close {
 				window.open = false;
 			}
-			egui::Window::new(format!("wheel {}", window_num)).open(&mut window.open).show(ctx, |ui| {
+			egui::Window::new(format!("wheel {}", window_num)).open(&mut window.open).show(egui_ctx, |ui| {
 				if request_close && Some(ui.layer_id()) == ui.ctx().top_layer_id() {
 					window.request_close = true;
 				}
@@ -344,10 +289,10 @@ impl eframe::App for App {
 						if editor_has_focus && ui.input_mut(|i| i.consume_key(Modifiers::default(), Key::Tab)) {
 							entry.content.push_str(COMPLETION.lock().unwrap().as_str().split('\n').next().unwrap());
 							COMPLETION.lock().unwrap().clear();
-							if let Some(mut state) = egui::TextEdit::load_state(ctx, id) {
+							if let Some(mut state) = egui::TextEdit::load_state(egui_ctx, id) {
 								let ccursor = egui::text::CCursor::new(entry.content.chars().count());
 								state.cursor.set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
-								state.store(ctx, id);
+								state.store(egui_ctx, id);
 								// ui.ctx().memory().request_focus(text_edit_id); // give focus back to the `TextEdit`.
 							}
 						}
@@ -459,7 +404,7 @@ impl eframe::App for App {
 						messages.push(ChatMessage { role: User, content: String::new(), token_count: 0 });
 						ui.ctx().memory_mut(|m| m.request_focus(Id::new((window_num * 1000) + messages.len() - 1)));
 						let id = messages.len() - 2;
-						let ctx_cloned = ctx.clone();
+						let ctx_cloned = egui_ctx.clone();
 						let (trigger, tripwire) = Tripwire::new();
 						self.trigger = Some(trigger);
 						tokio::spawn(async move {
@@ -479,29 +424,31 @@ impl eframe::App for App {
 			});
 		}
 
-		CentralPanel::default().show(ctx, |_ui| {});
+		CentralPanel::default().show(egui_ctx, |_ui| {});
+
+		Ok(())
 	}
 }
 
-fn ui_url(ui: &mut Ui, _frame: &mut eframe::Frame, url: &mut String) -> bool {
-	let mut trigger_fetch = false;
+// fn ui_url(ui: &mut Ui, _frame: &mut eframe::Frame, url: &mut String) -> bool {
+// 	let mut trigger_fetch = false;
 
-	ui.horizontal(|ui| {
-		ui.label("URL:");
-		trigger_fetch |= ui.add(TextEdit::singleline(url).desired_width(f32::INFINITY)).lost_focus();
-	});
+// 	ui.horizontal(|ui| {
+// 		ui.label("URL:");
+// 		trigger_fetch |= ui.add(TextEdit::singleline(url).desired_width(f32::INFINITY)).lost_focus();
+// 	});
 
-	ui.horizontal(|ui| {
-		if ui.button("Random image").clicked() {
-			let seed = ui.input(|i| i.time);
-			let side = 640;
-			*url = format!("https://picsum.photos/seed/{seed}/{side}");
-			trigger_fetch = true;
-		}
-	});
+// 	ui.horizontal(|ui| {
+// 		if ui.button("Random image").clicked() {
+// 			let seed = ui.input(|i| i.time);
+// 			let side = 640;
+// 			*url = format!("https://picsum.photos/seed/{seed}/{side}");
+// 			trigger_fetch = true;
+// 		}
+// 	});
 
-	trigger_fetch
-}
+// 	trigger_fetch
+// }
 
 fn ui_resource(ui: &mut Ui, resource: &Resource) {
 	let Resource { response, text, image } = resource;
@@ -578,16 +525,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	// std::thread::spawn(move || rt.block_on(async {}));
 
-	eframe::run_native(
-		"brace",
-		eframe::NativeOptions {
-			viewport: egui::ViewportBuilder::default()
-				.with_inner_size([400.0, 300.0])
-				.with_min_inner_size([300.0, 220.0]),
-			..Default::default()
-		},
-		Box::new(|cc| Ok(Box::new(App::new(cc)))),
-	)?;
+	tetra::ContextBuilder::new("brace", 1280, 720)
+		.high_dpi(true)
+		.show_mouse(true)
+		.resizable(true)
+		.build()?
+		.run(|_| Ok(egui_tetra2::StateWrapper::new(App::new())))
+		.unwrap();
+
+	// eframe::run_native(
+	// 	"brace",
+	// 	eframe::NativeOptions {
+	// 		viewport: egui::ViewportBuilder::default()
+	// 			.with_inner_size([400.0, 300.0])
+	// 			.with_min_inner_size([300.0, 220.0]),
+	// 		..Default::default()
+	// 	},
+	// 	Box::new(|cc| Ok(Box::new(App::new(cc)))),
+	// )?;
 
 	Ok(())
 }
