@@ -38,6 +38,7 @@ Current status: ChatGPT-like interface as a Rust desktop app, growing into a mor
 
 ### Good Ideas To-Do List:
 
-- Finish this explanation, push it to GitHub, link it from Twitch, start streaming.
-- Experiment with game creation with egui-tetra
 - Dynamic update of README.md
+- say something about aider?
+- add "coworking" twitch tag?
+- "using a game to see how far it can get, gpt writing shaders, music side"
