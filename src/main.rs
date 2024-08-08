@@ -64,6 +64,13 @@ impl Setting {
 		select!(Setting "WHERE key = " key)
 			.unwrap_or(Setting { key: key.to_string(), ..Default::default() })
 	}
+	fn get_with_default(key: &str, default: &str) -> Self {
+		select!(Setting "WHERE key = " key).unwrap_or(Setting {
+			key: key.to_string(),
+			value: default.to_string(),
+			..Default::default()
+		})
+	}
 	fn save(&self) {
 		if self.rowid.is_some() {
 			self.update().unwrap();
@@ -303,6 +310,13 @@ impl eframe::App for App {
 				.changed()
 				.then(|| setting2.save());
 
+			let mut setting3 = Setting::get_with_default("openai_model", "gpt-4o-mini");
+			ui.label("openai model:");
+			ui
+				.add(TextEdit::singleline(&mut setting3.value).desired_width(f32::INFINITY))
+				.changed()
+				.then(|| setting3.save());
+
 			ScrollArea::vertical().auto_shrink([false, false]).show(ui, |_ui| {
 				// let size = [ui.available_width(), ui.spacing().interact_size.y.max(20.0)];
 				// for card in cards {
@@ -463,7 +477,7 @@ impl eframe::App for App {
 						let (trigger, tripwire) = Tripwire::new();
 						self.trigger = Some(trigger);
 						tokio::spawn(async move {
-							run_openai("gpt-4o-mini", tripwire, orig_messages, move |content| {
+							run_openai(Setting::get("openai_model").value, tripwire, orig_messages, move |content| {
 								let mut wheel_windows = WHEEL_WINDOWS.lock().unwrap();
 								let entry = wheel_windows.get_mut(window_num).unwrap().messages.get_mut(id).unwrap();
 								entry.content.push_str(content);
@@ -593,7 +607,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) async fn run_openai(
-	model: &str,
+	model: impl AsRef<str>,
 	tripwire: Tripwire,
 	messages: Vec<ChatMessage>,
 	callback: impl Fn(&String) + Send + 'static,
@@ -641,7 +655,7 @@ pub(crate) async fn run_openai(
 	// dbg!(&messages);
 
 	let request = CreateChatCompletionRequestArgs::default()
-		.model(model)
+		.model(model.as_ref().to_owned())
 		.max_tokens(16384u16)
 		.messages(messages)
 		// .tools(vec![ChatCompletionToolArgs::default()
